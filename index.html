@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>신세계의 설계자: 마스터 에디션 v3.1</title>
+    <style>
+        :root {
+            --bg-color: #0f172a; --card-bg: #ffffff;
+            --text-dark: #1e293b; --text-light: #f8fafc;
+            --accent: #3b82f6;
+            --pros: #fbbf24; --nat: #22c55e; --har: #8b5cf6; --sec: #ef4444;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Pretendard', sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-light); height: 100vh; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+
+        /* 애니메이션 */
+        @keyframes shake { 0% { transform: translate(1px, 1px); } 20% { transform: translate(-3px, 0px); } 40% { transform: translate(3px, 2px); } 100% { transform: translate(0,0); } }
+        .shake { animation: shake 0.2s ease-in-out; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+        .danger-pulse { animation: pulse 0.6s infinite; border: 2px solid var(--sec) !important; }
+
+        .screen { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; padding: 20px; background: var(--bg-color); }
+        .screen.active { display: flex !important; }
+
+        #start-screen h1 { font-size: clamp(2rem, 8vw, 3.5rem); margin-bottom: 10px; text-shadow: 0 0 20px rgba(59, 130, 246, 0.5); text-align: center; }
+        .menu-btn { width: 280px; padding: 18px; margin: 8px; border-radius: 15px; border: none; background: #1e293b; color: white; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: 0.3s; border: 1px solid #334155; }
+        .menu-btn:hover { background: var(--accent); transform: translateY(-3px); }
+        .point-display { margin-top: 20px; font-size: 1.2rem; color: var(--pros); font-weight: bold; }
+
+        #game-wrapper { display: none; width: 100%; max-width: 1200px; height: 95vh; gap: 20px; padding: 20px; }
+        #game-wrapper.active { display: flex !important; }
+        #game-main { flex: 2; display: flex; flex-direction: column; align-items: center; position: relative; }
+        
+        #game-log-panel { flex: 1; background: rgba(30, 41, 59, 0.5); border-radius: 20px; border: 1px solid #334155; display: flex; flex-direction: column; overflow: hidden; }
+        #log-header { padding: 15px; background: #1e293b; font-weight: bold; border-bottom: 1px solid #334155; color: #94a3b8; }
+        #log-content { flex: 1; padding: 15px; overflow-y: auto; font-size: 0.85rem; color: #cbd5e1; }
+
+        #stat-header { width: 100%; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 15px; }
+        .stat-box { text-align: center; font-size: 0.7rem; background: rgba(255,255,255,0.05); padding: 8px; border-radius: 12px; transition: 0.3s; border: 1px solid transparent; }
+        .stat-val { font-size: 1.1rem; display: block; font-weight: 800; margin-bottom: 4px; }
+        .bar-container { height: 6px; background: #334155; border-radius: 3px; overflow: hidden; }
+        .bar-fill { height: 100%; width: 50%; transition: width 0.3s ease; }
+
+        #card-zone { position: relative; width: 100%; flex: 1; display: flex; justify-content: center; align-items: center; min-height: 400px; }
+        .card { 
+            position: absolute; width: 340px; height: 450px; background: var(--card-bg); border-radius: 30px; 
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5); color: var(--text-dark);
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+        .card-header-title { background: #f1f5f9; padding: 18px; font-size: 1.3rem; font-weight: 900; text-align: center; color: #0f172a; border-bottom: 1px solid #e2e8f0; }
+        .card-top-bar { height: 8px; width: 100%; }
+        .card-content { padding: 25px; flex: 1; display: flex; flex-direction: column; align-items: center; text-align: center; justify-content: center; }
+        .card-img { font-size: 5rem; margin: 10px 0; }
+
+        #inventory { display: flex; gap: 12px; margin: 15px 0; }
+        .inv-slot { width: 55px; height: 55px; background: #1e293b; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; position: relative; border: 1px solid #334155; cursor: pointer; }
+        .inv-count { position: absolute; top: -6px; right: -6px; background: var(--sec); color: white; border-radius: 10px; padding: 2px 7px; font-size: 0.75rem; font-weight: bold; }
+
+        .choice-btn { flex: 1; height: 65px; border-radius: 18px; border: none; color: white; font-weight: 800; cursor: pointer; font-size: 1rem; transition: 0.2s; }
+        #btn-L { background: #334155; } #btn-R { background: var(--accent); } #btn-M { background: #64748b; display: none; }
+
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 5000; align-items: center; justify-content: center; }
+        .modal-content { background: #1e293b; width: 90%; max-width: 450px; padding: 25px; border-radius: 25px; max-height: 85vh; overflow-y: auto; position: relative; }
+        .shop-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 15px; margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.1); }
+
+        /* 결과 화면: 하얀 화면 방지 로직 */
+        #game-over-screen { 
+            position: fixed; inset: 0; z-index: 9999 !important; 
+            background: var(--bg-color) !important; display: none; 
+            flex-direction: column; align-items: center; justify-content: center; 
+        }
+        #game-over-screen.active { display: flex !important; }
+    </style>
+</head>
+<body>
+
+    <div id="start-screen" class="screen active">
+        <p style="color: var(--accent); font-weight: 800; letter-spacing: 5px; margin-bottom: 5px;">PROJECT GENESIS</p>
+        <h1>신세계의 설계자</h1>
+        <div style="margin-bottom: 20px;">
+            <select id="difficulty-select" style="background: #1e293b; color: white; border: 1px solid #334155; padding: 8px; border-radius: 10px;">
+                <option value="1">일반 모드 (균형)</option>
+                <option value="1.5">하드 모드 (급변)</option>
+            </select>
+        </div>
+        <button class="menu-btn" onclick="startGame()">▶ 게임 시작</button>
+        <button class="menu-btn" onclick="showModal('shop-modal')">🛒 업적 상점</button>
+        <button class="menu-btn" onclick="showModal('guide-modal')">📖 게임 가이드</button>
+        <button class="menu-btn" onclick="showModal('achieve-modal')">🏆 달성 업적</button>
+        <div class="point-display">보유 포인트: <span id="user-points">0</span> AP</div>
+    </div>
+
+    <div id="game-wrapper">
+        <div id="game-main">
+            <div id="stat-header">
+                <div id="box-pros" class="stat-box">💰 <span id="v-pros" class="stat-val">50</span><div class="bar-container"><div id="b-pros" class="bar-fill" style="background:var(--pros)"></div></div></div>
+                <div id="box-nat" class="stat-box">🌳 <span id="v-nat" class="stat-val">50</span><div class="bar-container"><div id="b-nat" class="bar-fill" style="background:var(--nat)"></div></div></div>
+                <div id="box-har" class="stat-box">🤝 <span id="v-har" class="stat-val">50</span><div class="bar-container"><div id="b-har" class="bar-fill" style="background:var(--har)"></div></div></div>
+                <div id="box-sec" class="stat-box">🛡️ <span id="v-sec" class="stat-val">50</span><div class="bar-container"><div id="b-sec" class="bar-fill" style="background:var(--sec)"></div></div></div>
+            </div>
+            <div id="turn-display" style="font-weight: 800; color: #64748b; margin-bottom: 8px;">DAY 1 / 15</div>
+            <div id="card-zone">
+                <div id="main-card" class="card">
+                    <div id="c-title" class="card-header-title">시작</div>
+                    <div id="c-accent" class="card-top-bar"></div>
+                    <div class="card-content">
+                        <div id="c-img" class="card-img">🏙️</div>
+                        <p id="c-desc"></p>
+                    </div>
+                </div>
+            </div>
+            <div id="inventory">
+                <div class="inv-slot" title="수치 +10" onclick="useItem('UP')">🧪<div class="inv-count" id="count-UP">0</div></div>
+                <div class="inv-slot" title="수치 -10" onclick="useItem('DOWN')">📉<div class="inv-count" id="count-DOWN">0</div></div>
+                <div class="inv-slot" title="부활" style="cursor:help">💖<div class="inv-count" id="count-LIFE">0</div></div>
+                <div class="inv-slot" title="특별사건" onclick="useItem('EVENT')">🎫<div class="inv-count" id="count-EVENT">0</div></div>
+            </div>
+            <div class="btn-group" style="display:flex; gap:10px; width:100%;">
+                <button id="btn-L" class="choice-btn" onclick="handleChoice('L')">거절</button>
+                <button id="btn-M" class="choice-btn" onclick="handleChoice('M')">중립</button>
+                <button id="btn-R" class="choice-btn" onclick="handleChoice('R')">승인</button>
+            </div>
+        </div>
+        <div id="game-log-panel">
+            <div id="log-header">📜 통치 연대기</div>
+            <div id="log-content"></div>
+        </div>
+    </div>
+
+    <div id="guide-modal" class="modal" onclick="closeModal()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <h2>📖 게임 가이드</h2>
+            <div style="margin:20px 0; color:#cbd5e1; line-height:1.7; font-size:0.95rem;">
+                • 15일간 4가지 수치를 **1~99** 사이로 유지하세요.<br>
+                • 0이나 100이 되면 즉시 문명이 붕괴합니다.<br>
+                • **미스터리 카드**는 3가지 문 중 하나를 고르는 도박입니다.<br>
+                • 상점에서 **부활(💖)**을 미리 사두면 1번의 실수를 만회합니다.
+            </div>
+            <button class="menu-btn" style="width:100%;" onclick="closeModal()">이해했습니다</button>
+        </div>
+    </div>
+
+    <div id="shop-modal" class="modal" onclick="closeModal()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <h2 style="color:var(--pros); margin-bottom:15px;">🛒 업적 상점</h2>
+            <div id="shop-items-list"></div>
+            <button class="menu-btn" style="width:100%; margin-top:10px;" onclick="closeModal()">나가기</button>
+        </div>
+    </div>
+
+    <div id="achieve-modal" class="modal" onclick="closeModal()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <h2>🏆 달성 업적</h2>
+            <div id="ach-list" style="margin-top:15px;"></div>
+            <button class="menu-btn" style="width:100%; margin-top:15px;" onclick="closeModal()">닫기</button>
+        </div>
+    </div>
+
+    <div id="game-over-screen" class="screen">
+        <h1 id="over-title" style="font-size:3.5rem;">엔딩</h1>
+        <p id="ending-sub" style="color:var(--accent); font-weight:bold; margin-bottom:10px;"></p>
+        <div id="over-summary" style="margin: 20px 0; background:rgba(255,255,255,0.05); padding:20px; border-radius:15px; width:340px; line-height:1.6;"></div>
+        <div id="infinite-area" style="display:none; margin-bottom:20px;">
+            <button class="menu-btn" onclick="continueInfinite()" style="background:var(--nat)">무한 모드 도전</button>
+        </div>
+        <button class="menu-btn" onclick="location.reload()">메인으로 돌아가기</button>
+    </div>
+
+    <script>
+        // 이벤트 데이터
+        const normalEvents = [
+            { title: "해상 도시 건설", icon: "🏙️", theme: "#3b82f6", desc: "해수면 상승에 대비해 거대 해상 도시를 건설하시겠습니까?", L: "육지 집중", R: "해상 건설", sL: {pros:-10, sec:5}, sR: {pros:20, nat:-15} },
+            { title: "유전자 편집 식품", icon: "🧬", theme: "#22c55e", desc: "기아 문제를 해결하기 위해 유전자 편집 작물을 보급할까요?", L: "전통 방식", R: "기술 보급", sL: {har:5, pros:-10}, sR: {pros:20, nat:-15} },
+            { title: "안드로이드 노동자", icon: "🤖", theme: "#fbbf24", desc: "노동을 대체할 안드로이드를 산업 현장에 배치합니까?", L: "노동 보호", R: "효율 극대화", sL: {har:15, pros:-15}, sR: {pros:25, har:-20} },
+            { title: "심해 자원 채굴", icon: "⚓", theme: "#3b82f6", desc: "심해 광물을 채굴하여 막대한 부를 창출합시다.", L: "생태 보존", R: "채굴 시작", sL: {nat:15, pros:-10}, sR: {pros:25, nat:-25} }
+        ];
+        const guaranteedEvents = [
+            { title: "우주 탐사", icon: "🚀", theme: "#3b82f6", type: "EVENT", desc: "인류의 새로운 지평을 위한 우주 탐사를 시작합니다.", L: "현실 안주", R: "우주 항해", sL: {pros:5}, sR: {pros:30, nat:-20} },
+            { title: "AI 특이점", icon: "🧠", theme: "#8b5cf6", type: "EVENT", desc: "지능을 초월한 AI에게 통제권을 맡기시겠습니까?", L: "인간 중심", R: "AI 통치", sL: {sec:10}, sR: {pros:40, har:-30} }
+        ];
+
+        // 업적 20개 (10~40 AP 임의 배정)
+        const achDB = [
+            { id: 1, name: "초보 설계자", desc: "15일 통치 완료", pt: 10, cond: (s, t) => t > 15 },
+            { id: 2, name: "황금의 손", desc: "경제 90 이상", pt: 20, cond: (s) => s.pros >= 90 },
+            { id: 3, name: "자연의 수호자", desc: "자연 90 이상", pt: 20, cond: (s) => s.nat >= 90 },
+            { id: 4, name: "평화주의자", desc: "화합 90 이상", pt: 20, cond: (s) => s.har >= 90 },
+            { id: 5, name: "철통 보안", desc: "보안 90 이상", pt: 20, cond: (s) => s.sec >= 90 },
+            { id: 6, name: "도박사", desc: "미스터리 카드 대성공", pt: 30, cond: (s, t, l) => l.some(m => m.includes("대성공")) },
+            { id: 7, name: "불사신", desc: "부활 아이템 사용", pt: 15, cond: (s, t, l) => l.some(m => m.includes("부활")) },
+            { id: 8, name: "풍요로운 세상", desc: "모든 수치 60 이상", pt: 40, cond: (s) => s.pros >= 60 && s.nat >= 60 && s.har >= 60 && s.sec >= 60 },
+            { id: 9, name: "벼랑 끝 통치", desc: "수치 5 이하에서 생존", pt: 35, cond: (s) => Object.values(s).some(v => v <= 5) },
+            { id: 10, name: "검소한 설계자", desc: "아이템 없이 15일 버티기", pt: 30, cond: (s, t, l) => t > 15 && !l.some(m => m.includes("사용")) },
+            { id: 11, name: "우주 시대", desc: "우주 탐사 승인", pt: 15, cond: (s, t, l) => l.some(m => m.includes("우주 항해")) },
+            { id: 12, name: "AI 신", desc: "AI 통치 승인", pt: 15, cond: (s, t, l) => l.some(m => m.includes("AI 통치")) },
+            { id: 13, name: "무한의 여행자", desc: "무한 모드 진입", pt: 25, cond: (s, t) => t > 16 },
+            { id: 14, name: "짠돌이", desc: "포인트 100 보유", pt: 20, cond: () => points >= 100 },
+            { id: 15, name: "사건 매니아", desc: "이벤트 아이템 사용", pt: 15, cond: (s, t, l) => l.some(m => m.includes("사건의 균열")) },
+            { id: 16, name: "극단적 효율", desc: "경제 95 이상 달성", pt: 25, cond: (s) => s.pros >= 95 },
+            { id: 17, name: "재앙의 날", desc: "미스터리 카드 대실패", pt: 10, cond: (s, t, l) => l.some(m => m.includes("대실패")) },
+            { id: 18, name: "고독한 설계자", desc: "하드 모드 클리어", pt: 40, cond: (s, t) => t > 15 && diff > 1 },
+            { id: 19, name: "균형의 수호자", desc: "모든 수치 차이 10 이내", pt: 30, cond: (s) => Math.max(...Object.values(s)) - Math.min(...Object.values(s)) <= 10 },
+            { id: 20, name: "전설적 설계자", desc: "30일 생존", pt: 40, cond: (s, t) => t >= 30 }
+        ];
+
+        const shopDB = [
+            { id: 'UP', name: "상승 비약", desc: "수치 +10", cost: 5, icon: "🧪" },
+            { id: 'DOWN', name: "조절 추", desc: "수치 -10", cost: 5, icon: "📉" },
+            { id: 'LIFE', name: "부활 깃털", desc: "붕괴 시 부활", cost: 30, icon: "💖" },
+            { id: 'EVENT', name: "사건의 균열", desc: "특별사건 추가", cost: 20, icon: "🎫" }
+        ];
+
+        // 게임 상태
+        let stats = { pros: 50, nat: 50, har: 50, sec: 50 };
+        let inventory = { UP: 0, DOWN: 0, LIFE: 0, EVENT: 0 };
+        let points = parseInt(localStorage.getItem('design_pts') || '0');
+        let unlockedAch = JSON.parse(localStorage.getItem('design_ach_list') || '[]');
+        let turn = 1, diff = 1, isInfinite = false;
+        let pool = [], logHistory = [], mysteryLogic = [];
+        let usedMystery = false, usedGuaranteed = false;
+
+        function init() {
+            document.getElementById('user-points').innerText = points;
+            renderShop();
+            renderAch();
+        }
+
+        function startGame() {
+            diff = parseFloat(document.getElementById('difficulty-select').value);
+            document.getElementById('start-screen').classList.remove('active');
+            document.getElementById('game-wrapper').classList.add('active');
+            resetGame();
+        }
+
+        function resetGame() {
+            stats = { pros: 50, nat: 50, har: 50, sec: 50 };
+            turn = 1; isInfinite = false; usedMystery = false; usedGuaranteed = false;
+            pool = [...normalEvents].sort(() => Math.random() - 0.5);
+            logHistory = [];
+            document.getElementById('log-content').innerHTML = '';
+            updateUI();
+        }
+
+        function updateUI() {
+            for(let k in stats) {
+                const val = stats[k];
+                document.getElementById(`v-${k}`).innerText = val;
+                document.getElementById(`b-${k}`).style.width = Math.max(0, Math.min(100, val)) + '%';
+                const box = document.getElementById(`box-${k}`);
+                if (val <= 15 || val >= 85) box.classList.add('danger-pulse');
+                else box.classList.remove('danger-pulse');
+            }
+            document.getElementById('turn-display').innerText = `DAY ${turn} ${isInfinite ? '(무한)' : '/ 15'}`;
+            for(let k in inventory) document.getElementById(`count-${k}`).innerText = inventory[k];
+
+            if (!isInfinite && turn > 15) return endGame(true);
+
+            let curr;
+            document.getElementById('btn-M').style.display = 'none';
+
+            if (!usedMystery && turn >= 6 && Math.random() < 0.25) {
+                curr = { title: "심연의 문", icon: "🔮", type: "M_STD", desc: "세 문 중 하나를 택하세요. 운명이 결정됩니다.", L: "왼쪽", M: "중앙", R: "오른쪽" };
+                document.getElementById('btn-M').style.display = 'block';
+                mysteryLogic = ['LUCK', 'NONE', 'RISK'].sort(() => Math.random() - 0.5);
+                usedMystery = true;
+            } else if (!usedGuaranteed && turn >= 10 && Math.random() < 0.3) {
+                curr = guaranteedEvents[Math.floor(Math.random()*guaranteedEvents.length)];
+                usedGuaranteed = true;
+            } else {
+                curr = pool[turn % pool.length];
+            }
+
+            window.currentEvent = curr;
+            document.getElementById('c-title').innerText = curr.title;
+            document.getElementById('c-desc').innerText = curr.desc;
+            document.getElementById('c-img').innerText = curr.icon;
+            document.getElementById('c-accent').style.backgroundColor = curr.theme || '#475569';
+            document.getElementById('btn-L').innerText = curr.L || "거절";
+            document.getElementById('btn-R').innerText = curr.R || "승인";
+            if (curr.M) document.getElementById('btn-M').innerText = curr.M;
+        }
+
+        function handleChoice(dir) {
+            const card = document.getElementById('main-card');
+            card.classList.add('shake');
+            setTimeout(() => card.classList.remove('shake'), 200);
+
+            const curr = window.currentEvent;
+            let effect = {};
+            let logMsg = "";
+
+            if (curr.type && curr.type === "M_STD") {
+                const idx = (dir==='L'?0 : dir==='M'?1 : 2);
+                const res = mysteryLogic[idx];
+                const key = ['pros','nat','har','sec'][Math.floor(Math.random()*4)];
+                if(res==='LUCK') { effect[key]=25; logMsg="대성공"; }
+                else if(res==='RISK') { effect[key]=-25; logMsg="대실패"; }
+                else logMsg="변화 없음";
+            } else {
+                effect = (dir==='L' ? curr.sL : curr.sR);
+                logMsg = (dir==='L' ? curr.L : curr.R);
+            }
+
+            for(let k in effect) stats[k] += Math.round(effect[k] * diff);
+
+            if (Object.values(stats).some(v => v <= 0 || v >= 100)) {
+                if (inventory.LIFE > 0) {
+                    inventory.LIFE--;
+                    for(let k in stats) stats[k] = 50;
+                    alert("💖 부활 발동!"); logMsg += " (부활)";
+                } else return endGame(false);
+            }
+
+            addLog(turn, curr.title, logMsg);
+            turn++;
+            checkAchievements();
+            updateUI();
+        }
+
+        function endGame(win) {
+            closeModal();
+            document.getElementById('game-wrapper').style.display = 'none';
+            const screen = document.getElementById('game-over-screen');
+            screen.classList.add('active');
+            screen.style.display = 'flex'; // 확실히 노출
+
+            let title="", sub="", desc="";
+            if(!win) {
+                title="설계 실패"; sub="문명 붕괴"; desc="수치가 한계를 넘어 문명이 붕괴했습니다.";
+            } else {
+                document.getElementById('infinite-area').style.display = 'block';
+                if(stats.pros>=80 && stats.sec>=80) { title="강철의 제국"; sub="사이버펑크"; desc="경제와 치안은 완벽하나 자유가 사라졌습니다."; }
+                else if(stats.nat>=80 && stats.har>=80) { title="에덴 동산"; sub="유토피아"; desc="모든 인류가 자연과 평화롭게 공존합니다."; }
+                else { title="안정된 문명"; sub="성공적인 설계"; desc="당신은 훌륭히 15일을 견뎌냈습니다."; }
+            }
+            document.getElementById('over-title').innerText = title;
+            document.getElementById('ending-sub').innerText = sub;
+            document.getElementById('over-summary').innerHTML = `${desc}<hr style="margin:10px 0; opacity:0.2;">💰${stats.pros} 🌳${stats.nat} 🤝${stats.har} 🛡️${stats.sec}`;
+        }
+
+        function continueInfinite() {
+            isInfinite = true; diff += 0.2;
+            document.getElementById('game-over-screen').classList.remove('active');
+            document.getElementById('game-over-screen').style.display = 'none';
+            document.getElementById('game-wrapper').classList.add('active');
+            updateUI();
+        }
+
+        function useItem(type) {
+            if(inventory[type]<=0) return;
+            if(type==='EVENT') { usedGuaranteed=false; alert("🎫 특별 사건이 다시 활성화되었습니다."); }
+            else {
+                const target = prompt("1.경제 2.자연 3.화합 4.보안");
+                const key = ['pros','nat','har','sec'][parseInt(target)-1];
+                if(!key) return;
+                stats[key] += (type==='UP'? 10 : -10);
+            }
+            inventory[type]--;
+            addLog(turn, "아이템", `${type} 사용`);
+            updateUI();
+        }
+
+        function buyItem(id) {
+            const item = shopDB.find(i=>i.id===id);
+            if(points>=item.cost) {
+                points-=item.cost; inventory[id]++; saveData(); renderShop(); alert("구매 완료!");
+            } else alert("포인트 부족!");
+        }
+
+        function checkAchievements() {
+            achDB.forEach(ach => {
+                if(!unlockedAch.includes(ach.id) && ach.cond(stats, turn, logHistory)) {
+                    unlockedAch.push(ach.id); points+=ach.pt; saveData(); alert(`🏆 업적 달성: ${ach.name}`);
+                }
+            });
+        }
+
+        function saveData() {
+            localStorage.setItem('design_pts', points);
+            localStorage.setItem('design_ach_list', JSON.stringify(unlockedAch));
+            document.getElementById('user-points').innerText = points;
+        }
+
+        function addLog(d, title, action) {
+            logHistory.push(action);
+            const entry = document.createElement('div');
+            entry.innerHTML = `<strong>DAY ${d}</strong> ${title}: ${action}`;
+            document.getElementById('log-content').prepend(entry);
+        }
+
+        function renderShop() {
+            let h = '';
+            shopDB.forEach(i => h += `<div class="shop-item">
+                <div><b>${i.icon} ${i.name}</b><br><small>${i.desc}</small></div>
+                <button class="menu-btn" style="width:70px; padding:5px; font-size:0.8rem;" onclick="buyItem('${i.id}')">${i.cost}pt</button>
+            </div>`);
+            document.getElementById('shop-items-list').innerHTML = h;
+        }
+
+        function renderAch() {
+            let h = '';
+            achDB.forEach(a => h += `<div style="padding:10px; border-bottom:1px solid #334155; opacity:${unlockedAch.includes(a.id)?1:0.3}">
+                ${unlockedAch.includes(a.id)?'✅':'🔒'} <b>${a.name}</b> (${a.pt}pt)<br>${a.desc}
+            </div>`);
+            document.getElementById('ach-list').innerHTML = h;
+        }
+
+        function showModal(id) { document.getElementById(id).style.display = 'flex'; if(id==='achieve-modal') renderAch(); }
+        function closeModal() { document.querySelectorAll('.modal').forEach(m => m.style.display='none'); }
+
+        init();
+    </script>
+</body>
+</html>
